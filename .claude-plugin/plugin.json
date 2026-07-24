@@ -1,0 +1,9 @@
+{
+  "name": "image-composite",
+  "description": "GIS skill for image-composite",
+  "version": "0.1.0",
+  "author": "ruiduobao",
+  "skills": [
+    "image-composite"
+  ]
+}
