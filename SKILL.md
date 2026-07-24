@@ -1,15 +1,13 @@
 ---
-name: image-composite
-display_name: 遥感影像合成工具
-version: 0.1.0
-author: ruiduobao
-license: MIT-0
-description: |
-  Multi-temporal image compositing from local GeoTIFF files. Supports median, mean,
+description: 'Multi-temporal image compositing from local GeoTIFF files. Supports
+  median, mean,
+
   maxNDVI, and minRed compositing methods with cloud masking. Works on Landsat and
+
   Sentinel-2 band naming conventions.
-runtime: python>=3.8
-tags: [gis, remote-sensing, composite, landsat, sentinel, cli]
+
+  '
+name: image-composite
 ---
 
 # Image Composite
@@ -34,16 +32,16 @@ pip install rasterio numpy tqdm
 
 ```bash
 # Median composite of multiple scenes
-python scripts/image-composite.py composite --inputs scene1.tif scene2.tif scene3.tif --output composite.tif
+python scripts\image-composite.py composite --inputs scene1.tif scene2.tif scene3.tif --output composite.tif
 
 # Mean composite
-python scripts/image-composite.py composite --inputs *.tif --method mean --output mean_composite.tif
+python scripts\image-composite.py composite --inputs *.tif --method mean --output mean_composite.tif
 
 # maxNDVI composite (best vegetation)
-python scripts/image-composite.py composite --inputs *.tif --method maxNDVI --output ndvi_composite.tif
+python scripts\image-composite.py composite --inputs *.tif --method maxNDVI --output ndvi_composite.tif
 
 # Cloud masking
-python scripts/image-composite.py cloud-mask --input scene.tif --threshold 0.3 --output masked.tif
+python scripts\image-composite.py cloud-mask --input scene.tif --threshold 0.3 --output masked.tif
 ```
 
 ## Installation
@@ -191,7 +189,7 @@ For Sentinel-2 data: "Copernicus Sentinel data [2024] processed by ESA."
 ### Weekly Composite Pipeline
 ```bash
 # Composite all scenes from a week
-python scripts/image_composite.py composite   --images S2A_20230101.tif S2A_20230105.tif S2A_20230110.tif   --method maxNDVI --sensor sentinel2   --output composite_week1.tif
+python scripts\image-composite.py composite   --images S2A_20230101.tif S2A_20230105.tif S2A_20230110.tif   --method maxNDVI --sensor sentinel2   --output composite_week1.tif
 ```
 
 ### CI/CD Integration (GitHub Actions)
@@ -211,7 +209,7 @@ jobs:
           python-version: '3.11'
       - run: pip install numpy rasterio
       - run: |
-          python scripts/image_composite.py composite \
+          python scripts\image-composite.py composite \
             --images data/scenes/*.tif \
             --method maxNDVI --sensor sentinel2 \
             --output data/composite_$(date +%Y%m%d).tif
@@ -259,16 +257,16 @@ pip install rasterio numpy tqdm
 
 ```bash
 # 中位数合成
-python scripts/image-composite.py composite --inputs scene1.tif scene2.tif scene3.tif --output composite.tif
+python scripts\image-composite.py composite --inputs scene1.tif scene2.tif scene3.tif --output composite.tif
 
 # 平均值合成
-python scripts/image-composite.py composite --inputs *.tif --method mean --output mean_composite.tif
+python scripts\image-composite.py composite --inputs *.tif --method mean --output mean_composite.tif
 
 # 最大 NDVI 合成（最佳植被）
-python scripts/image-composite.py composite --inputs *.tif --method maxNDVI --output ndvi_composite.tif
+python scripts\image-composite.py composite --inputs *.tif --method maxNDVI --output ndvi_composite.tif
 
 # 云掩膜
-python scripts/image-composite.py cloud-mask --input scene.tif --threshold 0.3 --output masked.tif
+python scripts\image-composite.py cloud-mask --input scene.tif --threshold 0.3 --output masked.tif
 ```
 
 ### 数据来源
