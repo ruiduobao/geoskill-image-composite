@@ -3,7 +3,9 @@
 
 import sys
 import os
+import csv
 import json
+import tempfile
 import importlib.util
 import unittest
 from unittest.mock import patch, MagicMock
@@ -110,16 +112,16 @@ class TestDetectClouds(unittest.TestCase):
 class TestCLI(unittest.TestCase):
     def test_composite_invalid_method(self):
         args = ic.argparse.Namespace(
-            inputs=["a.tif", "b.tif"], output="out.tif",
-            method="invalid_method", cloud_mask=None,
+            inputs=["a.tif", "b.tif"], input_dir=None, output="out.tif",
+            method="invalid_method", preset=None, cloud_mask=None, qa=False, place=None,
         )
         rc = ic.cmd_composite(args)
         self.assertEqual(rc, 1)
 
     def test_composite_too_few_inputs(self):
         args = ic.argparse.Namespace(
-            inputs=["only_one.tif"], output="out.tif",
-            method="median", cloud_mask=None,
+            inputs=["only_one.tif"], input_dir=None, output="out.tif",
+            method="median", preset=None, cloud_mask=None, qa=False, place=None,
         )
         rc = ic.cmd_composite(args)
         self.assertEqual(rc, 1)
@@ -134,6 +136,150 @@ class TestCLI(unittest.TestCase):
 
 # Need numpy for tests
 import numpy as np
+
+
+class TestFormatArgParser(unittest.TestCase):
+    """Test --format argument on the 'composite' subcommand (batch-D)."""
+
+    def test_default_format(self):
+        # Replicate the relevant portion of the parser
+        import argparse
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest="command")
+        p = sub.add_parser("composite")
+        p.add_argument("--format", choices=["auto", "geotiff", "png"], default="auto")
+        args = parser.parse_args(["composite"])
+        self.assertEqual(args.format, "auto")
+
+    def test_geotiff_format(self):
+        import argparse
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest="command")
+        p = sub.add_parser("composite")
+        p.add_argument("--format", choices=["auto", "geotiff", "png"], default="auto")
+        args = parser.parse_args(["composite", "--format", "geotiff"])
+        self.assertEqual(args.format, "geotiff")
+
+    def test_png_format(self):
+        import argparse
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest="command")
+        p = sub.add_parser("composite")
+        p.add_argument("--format", choices=["auto", "geotiff", "png"], default="auto")
+        args = parser.parse_args(["composite", "--format", "png"])
+        self.assertEqual(args.format, "png")
+
+    def test_rejects_unknown_format(self):
+        import argparse
+        parser = argparse.ArgumentParser()
+        sub = parser.add_subparsers(dest="command")
+        p = sub.add_parser("composite")
+        p.add_argument("--format", choices=["auto", "geotiff", "png"], default="auto")
+        with self.assertRaises(SystemExit):
+            parser.parse_args(["composite", "--format", "jpeg"])
+
+
+class TestCompositeEndToEndFormat(unittest.TestCase):
+    """End-to-end: composite two synthetic GeoTIFFs to a chosen format."""
+
+    def _make_raster(self, path, data, profile_overrides=None):
+        import rasterio as rio
+        from rasterio.transform import Affine
+        if data.ndim == 2:
+            data = data[None, :, :]
+        n_bands, height, width = data.shape
+        transform = Affine(1.0, 0.0, 0.0, 0.0, -1.0, float(height))
+        profile = {
+            "driver": "GTiff", "height": height, "width": width,
+            "count": n_bands, "dtype": "float32", "crs": "EPSG:4326",
+            "transform": transform, "nodata": -9999.0,
+        }
+        if profile_overrides:
+            profile.update(profile_overrides)
+        with rio.open(path, "w", **profile) as dst:
+            for i in range(n_bands):
+                dst.write(data[i], i + 1)
+
+    def test_composite_to_png(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = os.path.abspath(d)
+            data1 = np.array([
+                [[0.1, 0.2, 0.3, 0.4]],
+                [[0.2, 0.3, 0.4, 0.5]],
+                [[0.3, 0.4, 0.5, 0.6]],
+                [[0.4, 0.5, 0.6, 0.7]],
+            ], dtype="float32")
+            data2 = np.array([
+                [[0.15, 0.25, 0.35, 0.45]],
+                [[0.25, 0.35, 0.45, 0.55]],
+                [[0.35, 0.45, 0.55, 0.65]],
+                [[0.45, 0.55, 0.65, 0.75]],
+            ], dtype="float32")
+            p1 = os.path.join(d, "a.tif")
+            p2 = os.path.join(d, "b.tif")
+            self._make_raster(p1, data1)
+            self._make_raster(p2, data2)
+            out_png = os.path.join(d, "composite.png")
+            args = ic.argparse.Namespace(
+                inputs=[p1, p2], input_dir=None, output=out_png,
+                method="median", preset=None, cloud_mask=None,
+                qa=False, place=None, format="png",
+            )
+            rc = ic.cmd_composite(args)
+            self.assertEqual(rc, 0)
+            self.assertTrue(os.path.exists(out_png))
+            # Verify it's a PNG
+            with open(out_png, "rb") as f:
+                magic = f.read(8)
+            self.assertEqual(magic, b"\x89PNG\r\n\x1a\n")
+
+    def test_composite_to_geotiff_explicit(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = os.path.abspath(d)
+            data1 = np.array([
+                [[0.1, 0.2, 0.3, 0.4]],
+                [[0.2, 0.3, 0.4, 0.5]],
+            ], dtype="float32")
+            data2 = np.array([
+                [[0.15, 0.25, 0.35, 0.45]],
+                [[0.25, 0.35, 0.45, 0.55]],
+            ], dtype="float32")
+            p1 = os.path.join(d, "a.tif")
+            p2 = os.path.join(d, "b.tif")
+            self._make_raster(p1, data1)
+            self._make_raster(p2, data2)
+            out_tif = os.path.join(d, "composite.tif")
+            args = ic.argparse.Namespace(
+                inputs=[p1, p2], input_dir=None, output=out_tif,
+                method="median", preset=None, cloud_mask=None,
+                qa=False, place=None, format="geotiff",
+            )
+            rc = ic.cmd_composite(args)
+            self.assertEqual(rc, 0)
+            self.assertTrue(os.path.exists(out_tif))
+            import rasterio as rio
+            with rio.open(out_tif) as src:
+                self.assertEqual(src.count, 2)
+                self.assertEqual(src.width, 4)
+                self.assertEqual(src.height, 1)
+
+    def test_composite_unknown_format_returns_error(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = os.path.abspath(d)
+            data1 = np.array([[[0.1, 0.2]]], dtype="float32")
+            data2 = np.array([[[0.15, 0.25]]], dtype="float32")
+            p1 = os.path.join(d, "a.tif")
+            p2 = os.path.join(d, "b.tif")
+            self._make_raster(p1, data1)
+            self._make_raster(p2, data2)
+            out = os.path.join(d, "composite.xyz")
+            args = ic.argparse.Namespace(
+                inputs=[p1, p2], input_dir=None, output=out,
+                method="median", preset=None, cloud_mask=None,
+                qa=False, place=None, format="jpeg",
+            )
+            rc = ic.cmd_composite(args)
+            self.assertEqual(rc, 1)
 
 
 if __name__ == "__main__":
