@@ -1,6 +1,6 @@
 ---
 name: image-composite
-description: 'Multi-temporal image compositing from local GeoTIFF files. Supports description: 'Multi-temporal image compositing from local GeoTIFF files. Supports median, mean,  maxNDVI, and minRed compositing methods with cloud masking. Works on Landsat and  Sentinel-2 band naming conventions.  '
+description: 'Multi-temporal image compositing from local GeoTIFF files. Supports median, mean,  maxNDVI, and minRed compositing methods with cloud masking. Works on Landsat and  Sentinel-2 band naming conventions.  '
 ---
 
 # Image Composite
